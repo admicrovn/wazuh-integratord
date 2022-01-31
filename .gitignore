@@ -1,0 +1,10 @@
+.DS_Store
+.idea
+/offset.seek
+/wazuh-integratord
+/ossec.conf
+/alerts.json
+/wazuh-integratord.log
+/wazuh-integratord.pid
+/ossec.log
+/integrator.sock

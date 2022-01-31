@@ -1,0 +1,13 @@
+<ossec_config>
+
+  <integration_max_workers>20</integration_max_workers>
+
+  <integration>
+    <name>custom-telegram</name>
+    <level>5</level>
+    <hook_url>xxx</hook_url>
+    <api_key>xxx</api_key>
+    <alert_format>json</alert_format>
+  </integration>
+
+</ossec_config>
