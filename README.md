@@ -1,9 +1,9 @@
 # Wazuh Integratord
 
-The [Wazuh Integratord](https://github.com/wazuh/wazuh/tree/master/src/os_integrator) is a daemon that allows Wazuh to
+The `wazuh-integratord` is a daemon that allows Wazuh to
 connect to external APIs and alerting tools such as Slack, VirusTotal and PagerDuty.
 
-The original version of `wazuh-integratord` is running in single thread. When there is a large number of alert and the
+The [original version](https://github.com/wazuh/wazuh/tree/master/src/os_integrator) is running in single thread. When there is a large number of alert and the
 connections to external APIs are slow, the alerting will be delayed.
 
 This version is written in Go. It was created to help to parse alerts log and alerting faster.
