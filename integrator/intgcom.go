@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/admicrovn/wazuh-integratord/config"
 	log "github.com/sirupsen/logrus"
+	"io"
 	"net"
 	"os"
 )
@@ -12,7 +13,7 @@ const defaultSockAddr = "/var/ossec/queue/sockets/integrator"
 
 // getIntegrationConfig listen and respond for requests
 // get integration config from Wazuh Manager API
-func (i *Integrator) getIntegrationConfig(c net.Conn) {
+func (i *Integrator) getIntegrationConfig(c io.ReadWriteCloser) {
 	buf := make([]byte, 1024)
 	n, err := c.Read(buf)
 	if err != nil {
@@ -43,7 +44,9 @@ func (i *Integrator) getIntegrationConfig(c net.Conn) {
 		// captured from a response of original wazuh-integratord
 		// https://github.com/wazuh/wazuh/blob/master/framework/wazuh/core/wazuh_socket.py#L46
 		spacesB := []byte{9, 2, 0, 0}
-		respB := append(spacesB, okB...)
+		var respB []byte
+		respB = append(respB, spacesB...)
+		respB = append(respB, okB...)
 		respB = append(respB, []byte{32}...)
 		respB = append(respB, integrationConfB...)
 		// response something like this:
@@ -83,7 +86,7 @@ func (i *Integrator) RunIntegratorSocketServer() {
 		var conn net.Conn
 		conn, err = l.Accept()
 		if err != nil {
-			log.Fatalf("accept error: %s", err)
+			log.Panicf("accept error: %s", err)
 		}
 
 		go i.getIntegrationConfig(conn)

@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/user"
+	"path"
 	"strconv"
 	"syscall"
 )
@@ -20,7 +21,7 @@ const (
 	defaultOssecPath = "/var/ossec/"
 	defaultPidFile   = "/var/ossec/var/run/wazuh-integratord.pid"
 	defaultLogFile   = "/var/ossec/logs/ossec.log"
-	defaultUser      = "ossecm"
+	defaultUser      = "wazuh"
 	appName          = "wazuh-integratord"
 )
 
@@ -30,7 +31,7 @@ type Formatter struct {
 }
 
 func (f *Formatter) Format(entry *log.Entry) ([]byte, error) {
-	timestamp := fmt.Sprintf(entry.Time.Format(f.TimeFormat))
+	timestamp := entry.Time.Format(f.TimeFormat)
 	return []byte(fmt.Sprintf("%s %s: %s: %s\n", timestamp, appName, f.LevelDesc[entry.Level], entry.Message)), nil
 }
 
@@ -88,7 +89,7 @@ func main() {
 		ossecPath := defaultOssecPath
 		var cred *syscall.Credential
 		// development
-		if os.Getenv("ENV") == "dev" {
+		if os.Getenv("ENV") == integrator.DEV {
 			pidFile = "./wazuh-integratord.pid"
 			logFile = "./ossec.log"
 			ossecPath = "./"
@@ -105,7 +106,8 @@ func main() {
 				Gid: uint32(gid),
 			}
 		}
-		cntxt := &daemon.Context{
+
+		dCtx := &daemon.Context{
 			PidFileName: pidFile,
 			PidFilePerm: 0644,
 			LogFileName: logFile,
@@ -114,15 +116,31 @@ func main() {
 			Credential:  cred,
 			Umask:       027,
 		}
+
 		var d *os.Process
-		d, err = cntxt.Reborn()
+		d, err = dCtx.Reborn()
 		if err != nil {
 			log.Fatalf("unable to run: %s", err)
 		}
 		if d != nil {
 			return
 		}
-		defer cntxt.Release()
+
+		// on production, we will write pid to a pid file in format: wazuh-integratord-<pid>.pid
+		if os.Getenv("ENV") != integrator.DEV {
+			var proc *os.Process
+			proc, err = dCtx.Search()
+			if err != nil {
+				log.Fatalf("unable to search: %s", err)
+			}
+			newPidFile := path.Join(defaultOssecPath, "var", "run", fmt.Sprintf("%s-%d.pid", appName, proc.Pid))
+			err = writePid(proc.Pid, newPidFile)
+			if err != nil {
+				log.Fatalf("unable to write pid: %s", err)
+			}
+		}
+
+		defer dCtx.Release()
 		go setupLog(logFile)
 	}
 	i := integrator.New(cfg)
@@ -169,7 +187,12 @@ func setupLog(logFile string) {
 	}()
 	err = watcher.Add(logFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	<-done
+}
+
+// write pid to file
+func writePid(pid int, pidFile string) error {
+	return os.WriteFile(pidFile, []byte(strconv.Itoa(pid)), 0640) //nolint:gosec
 }
