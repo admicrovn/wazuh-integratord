@@ -87,12 +87,15 @@ func (i *Integrator) Run() {
 	}
 }
 
-// Stats print number of alerts in the waiting queue every 10s
-func (i *Integrator) Stats() {
+// MonitorWaitingQueue Get waiting queue size every 10 seconds
+// Warning if waiting queue size > maxWorkers configured
+func (i *Integrator) MonitorWaitingQueue() {
 	for {
 		time.Sleep(10 * time.Second)
 		waitingQueueSize := i.wp.WaitingQueueSize()
-		log.Infof("alerts_in_waiting_queue: %d", waitingQueueSize)
+		if waitingQueueSize > i.config.IntegratorConfig.MaxWorkers {
+			log.Warnf("alerts_in_waiting_queue: %d", waitingQueueSize)
+		}
 	}
 }
 
@@ -174,15 +177,13 @@ func (i *Integrator) parseAlertAndRunIntegration(s string, alert Alert) {
 					continue
 				}
 			}
-			if integration.Level != nil {
-				if alert.Rule.Level == nil {
-					log.Tracef("[%s] skipping: alert doesn't contain rule level", integration.Name)
-					continue
-				}
-				if *alert.Rule.Level < *integration.Level {
-					log.Tracef("[%s] skipping: alert level is too low", integration.Name)
-					continue
-				}
+			if alert.Rule.Level == nil {
+				log.Tracef("[%s] skipping: alert doesn't contain rule level", integration.Name)
+				continue
+			}
+			if *alert.Rule.Level < integration.Level {
+				log.Tracef("[%s] skipping: alert level is too low", integration.Name)
+				continue
 			}
 			if len(integration.Groups) > 0 {
 				var match bool
@@ -219,7 +220,7 @@ func (i *Integrator) parseAlertAndRunIntegration(s string, alert Alert) {
 				goto CleanUp
 			}
 			// execute integration command
-			err = executeCommand(integration.Name, tmpFile, *integration.ApiKey, *integration.HookUrl)
+			err = executeCommand(integration.Name, tmpFile, integration.APIKey, integration.HookURL)
 			if err != nil {
 				log.Errorf("[%s] exec integration command err: %s", integration.Name, err)
 			}

@@ -144,7 +144,7 @@ func main() {
 		go setupLog(logFile)
 	}
 	i := integrator.New(cfg)
-	go i.Stats()
+	go i.MonitorWaitingQueue()
 	go i.RunIntegratorSocketServer()
 	i.Run()
 }
