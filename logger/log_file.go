@@ -37,8 +37,11 @@ func (l *LogFile) Write(b []byte) (n int, err error) {
 
 // Rotate creates new one, switches log and closes the old file.
 func (l *LogFile) Rotate() error {
-	// create new file.
+	// open new file.
 	file, err := os.OpenFile(l.name, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0660)
+	if err != nil {
+		return err
+	}
 	// switch dest file safely.
 	l.mu.Lock()
 	file, l.file = l.file, file

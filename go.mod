@@ -8,7 +8,7 @@ require (
 	github.com/goccy/go-json v0.10.2
 	github.com/grafana/tail v0.0.0-20230510142333-77b18831edf0
 	github.com/sevlyar/go-daemon v0.1.6
-	github.com/sirupsen/logrus v1.9.2
+	github.com/sirupsen/logrus v1.9.3
 )
 
 require (

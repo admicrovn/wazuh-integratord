@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,16 +31,16 @@ type WazuhConfig struct {
 
 type Integration struct {
 	Name             string   `xml:"name" json:"name"`
-	HookUrl          *string  `xml:"hook_url" json:"hook_url,omitempty"`
-	ApiKey           *string  `xml:"api_key" json:"api_key,omitempty"`
-	Level            *int     `xml:"level" json:"level,omitempty"`
-	RawRuleId        string   `xml:"rule_id" json:"rule_id,omitempty"`
+	HookURL          string   `xml:"hook_url" json:"hook_url,omitempty"`
+	APIKey           string   `xml:"api_key" json:"api_key,omitempty"`
+	Level            int      `xml:"level" json:"level,omitempty"`
+	RawRuleID        string   `xml:"rule_id" json:"rule_id,omitempty"`
 	RuleIDs          []int    `xml:"-" json:"-"`
 	RawGroup         string   `xml:"group" json:"group,omitempty"`
 	Groups           []string `xml:"-" json:"-"`
-	RawEventLocation *string  `xml:"event_location" json:"event_location,omitempty"`
+	RawEventLocation string   `xml:"event_location" json:"event_location,omitempty"`
 	EventLocations   []string `xml:"-" json:"-"`
-	AlertFormat      *string  `xml:"alert_format" json:"alert_format,omitempty"`
+	AlertFormat      string   `xml:"alert_format" json:"alert_format,omitempty"`
 }
 
 // GetConfig parse ossec.conf then returns config struct
@@ -56,28 +57,28 @@ func GetConfig() (*Config, error) {
 	// load wazuh config
 	wazuhConf, err := os.Open(wazuhConfFile)
 	if err != nil {
-		return nil, fmt.Errorf("read wazuh config err: %s", err)
+		return nil, fmt.Errorf("read wazuh config err: %w", err)
 	}
 	defer wazuhConf.Close()
 	data, _ := io.ReadAll(wazuhConf)
 	var wazuhConfig WazuhConfig
 	err = xml.Unmarshal(data, &wazuhConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal err: %s", err)
+		return nil, fmt.Errorf("unmarshal err: %w", err)
 	}
 
 	// load integrator config
 	var integratorConf *os.File
 	integratorConf, err = os.Open(integratorConfFile)
 	if err != nil {
-		return nil, fmt.Errorf("read integrator config err: %s", err)
+		return nil, fmt.Errorf("read integrator config err: %w", err)
 	}
 	defer integratorConf.Close()
 	data, _ = io.ReadAll(integratorConf)
 	var integratorConfig IntegratorConfig
 	err = xml.Unmarshal(data, &integratorConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal err: %s", err)
+		return nil, fmt.Errorf("unmarshal err: %w", err)
 	}
 
 	if check, dup := entryIsDuplicate(wazuhConfig); check {
@@ -86,10 +87,10 @@ func GetConfig() (*Config, error) {
 	if integratorConfig.MaxWorkers == 0 {
 		integratorConfig.MaxWorkers = defaultMaxWorkers
 	}
-	var newIntegrations []Integration
+	newIntegrations := make([]Integration, 0)
 	for _, integration := range wazuhConfig.Integrations {
 		if len(integration.Name) == 0 {
-			return nil, fmt.Errorf("name can't be empty")
+			return nil, errors.New("name can't be empty")
 		}
 		integrationBin := fmt.Sprintf("/var/ossec/integrations/%s", integration.Name)
 		// development
@@ -100,58 +101,50 @@ func GetConfig() (*Config, error) {
 			return nil, fmt.Errorf("%s doesn't exist", integrationBin)
 		}
 		if integration.Name != "slack" && integration.Name != "pagerduty" && integration.Name != "virustotal" && !strings.HasPrefix(integration.Name, "custom-") {
-			return nil, fmt.Errorf("name must be 'slack', 'pagerduty', 'virustotal' or 'custom-'")
+			return nil, errors.New("name must be 'slack', 'pagerduty', 'virustotal' or 'custom-'")
 		}
-		if integration.Level != nil {
-			if *integration.Level < 0 && *integration.Level > 16 {
-				return nil, fmt.Errorf("level must in range 0-16")
-			}
+		if integration.Level < 1 || integration.Level > 16 {
+			return nil, errors.New("level must in range 1-16")
 		}
-		if len(integration.RawRuleId) > 0 {
-			ruleIDs := strings.Split(integration.RawRuleId, ",")
+		if integration.RawRuleID != "" {
+			ruleIDs := strings.Split(integration.RawRuleID, ",")
 			if len(ruleIDs) > 0 {
 				for _, sRuleID := range ruleIDs {
 					var ruleID int
 					ruleID, err = strconv.Atoi(sRuleID)
 					if err != nil {
-						return nil, fmt.Errorf("rule_id must be a number or multiple numbers separated by commas")
+						return nil, errors.New("rule_id must be a number or multiple numbers separated by commas")
 					}
 					integration.RuleIDs = append(integration.RuleIDs, ruleID)
 				}
 				integration.RuleIDs = unique(integration.RuleIDs)
 			} else {
 				var ruleID int
-				ruleID, err = strconv.Atoi(integration.RawRuleId)
+				ruleID, err = strconv.Atoi(integration.RawRuleID)
 				if err != nil {
-					return nil, fmt.Errorf("rule_id must be a number or multiple numbers separated by commas")
+					return nil, errors.New("rule_id must be a number or multiple numbers separated by commas")
 				}
 				integration.RuleIDs = append(integration.RuleIDs, ruleID)
 			}
 		}
-		if len(integration.RawGroup) > 0 {
+		if integration.RawGroup != "" {
 			groups := strings.Split(integration.RawGroup, ",")
 			if len(groups) > 0 {
-				for _, group := range groups {
-					integration.Groups = append(integration.Groups, group)
-				}
+				integration.Groups = append(integration.Groups, groups...)
 			} else {
 				integration.Groups = append(integration.Groups, integration.RawGroup)
 			}
 		}
-		if integration.RawEventLocation != nil {
-			eventLocations := strings.Split(*integration.RawEventLocation, ",")
+		if integration.RawEventLocation != "" {
+			eventLocations := strings.Split(integration.RawEventLocation, ",")
 			if len(eventLocations) > 0 {
-				for _, location := range eventLocations {
-					integration.EventLocations = append(integration.EventLocations, location)
-				}
+				integration.EventLocations = append(integration.EventLocations, eventLocations...)
 			} else {
-				integration.EventLocations = append(eventLocations, *integration.RawEventLocation)
+				integration.EventLocations = append(integration.EventLocations, integration.RawEventLocation)
 			}
 		}
-		if integration.AlertFormat != nil {
-			if *integration.AlertFormat != "json" {
-				return nil, fmt.Errorf("alert_format must be 'json'")
-			}
+		if integration.AlertFormat != "json" {
+			return nil, errors.New("alert_format must be 'json'")
 		}
 		newIntegrations = append(newIntegrations, integration)
 	}
@@ -191,7 +184,7 @@ func uniqueString(intSlice []string) ([]string, []string) {
 }
 
 func entryIsDuplicate(input WazuhConfig) (bool, string) {
-	var names []string
+	names := make([]string, 0)
 	for _, integration := range input.Integrations {
 		names = append(names, integration.Name)
 	}
