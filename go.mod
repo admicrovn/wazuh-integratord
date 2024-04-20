@@ -1,6 +1,6 @@
 module github.com/admicrovn/wazuh-integratord
 
-go 1.21
+go 1.22
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
@@ -14,7 +14,7 @@ require (
 require (
 	github.com/gammazero/deque v0.2.1 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/sys v0.19.0 // indirect
 	gopkg.in/fsnotify/fsnotify.v1 v1.4.7 // indirect
-	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
+	gopkg.in/tomb.v1 v1.0.0-20140529071818-c131134a1947 // indirect
 )
