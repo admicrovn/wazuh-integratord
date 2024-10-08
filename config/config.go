@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -92,13 +93,13 @@ func GetConfig() (*Config, error) {
 		if len(integration.Name) == 0 {
 			return nil, errors.New("name can't be empty")
 		}
-		integrationBin := fmt.Sprintf("/var/ossec/integrations/%s", integration.Name)
+		integrationExecPath := path.Join("/var/ossec/integrations/", integration.Name)
 		// development
 		if env == "dev" {
-			integrationBin = "./custom-integration.sh"
+			integrationExecPath = "./custom-integration.sh"
 		}
-		if _, err = os.Stat(integrationBin); os.IsNotExist(err) {
-			return nil, fmt.Errorf("%s doesn't exist", integrationBin)
+		if _, err = os.Stat(integrationExecPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("%s doesn't exist", integrationExecPath)
 		}
 		if integration.Name != "slack" && integration.Name != "pagerduty" && integration.Name != "virustotal" && !strings.HasPrefix(integration.Name, "custom-") {
 			return nil, errors.New("name must be 'slack', 'pagerduty', 'virustotal' or 'custom-'")

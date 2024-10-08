@@ -11,6 +11,8 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -103,7 +105,7 @@ func (i *Integrator) MonitorWaitingQueue() {
 func createTmpAlertFile(integrationName string, data []byte) (string, error) {
 	now := time.Now().Unix()
 	randNum := rand.Int() //nolint:gosec
-	tmpFile := fmt.Sprintf("/tmp/%s-%d-%d.alert", integrationName, now, randNum)
+	tmpFile := path.Join("/tmp", fmt.Sprintf("%s-%d-%d.alert", integrationName, now, randNum))
 	err := os.WriteFile(tmpFile, data, 0644) //nolint:gosec
 	if err != nil {
 		return "", err
@@ -111,14 +113,14 @@ func createTmpAlertFile(integrationName string, data []byte) (string, error) {
 	return tmpFile, nil
 }
 
-// executeCommand execute integration command
-func executeCommand(integrationName, tempFile, apiKey, hookURL string) error {
-	integrationBin := fmt.Sprintf("%s/%s", defaultIntegrationsPath, integrationName)
+// executeIntegrationCmd execute integration command
+func executeIntegrationCmd(integrationName, tempFile, apiKey, hookURL string) error {
+	integrationExecPath := path.Join(defaultIntegrationsPath, integrationName)
 	// development
 	if os.Getenv("ENV") == DEV {
-		integrationBin = "./custom-integration.sh"
+		integrationExecPath = "./custom-integration.sh"
 	}
-	integrationCmd := exec.Command(integrationBin, tempFile, apiKey, hookURL)
+	integrationCmd := exec.Command(integrationExecPath, tempFile, apiKey, hookURL)
 	log.Debugf("running: %s", integrationCmd.String())
 	out, err := integrationCmd.CombinedOutput()
 	if err != nil {
@@ -126,15 +128,6 @@ func executeCommand(integrationName, tempFile, apiKey, hookURL string) error {
 	}
 	log.Debugf("[%s] command ran successfully", integrationName)
 	return nil
-}
-
-func contains(arr []int, i int) bool {
-	for _, v := range arr {
-		if v == i {
-			return true
-		}
-	}
-	return false
 }
 
 // handleAlert parse alert json
@@ -209,7 +202,7 @@ func (i *Integrator) parseAlertAndRunIntegration(s string, alert Alert) {
 					log.Errorf("[%s] alert rule id must be a number", integration.Name)
 					continue
 				}
-				if !contains(integration.RuleIDs, ruleID) {
+				if !slices.Contains(integration.RuleIDs, ruleID) {
 					log.Tracef("[%s] skipping: rule id doesn't match", integration.Name)
 					continue
 				}
@@ -220,7 +213,7 @@ func (i *Integrator) parseAlertAndRunIntegration(s string, alert Alert) {
 				goto CleanUp
 			}
 			// execute integration command
-			err = executeCommand(integration.Name, tmpFile, integration.APIKey, integration.HookURL)
+			err = executeIntegrationCmd(integration.Name, tmpFile, integration.APIKey, integration.HookURL)
 			if err != nil {
 				log.Errorf("[%s] exec integration command err: %s", integration.Name, err)
 			}

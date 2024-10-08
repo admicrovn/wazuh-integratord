@@ -79,6 +79,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("config err: %s", err)
 	}
+	log.Debugf("config: %+v", cfg)
 	if *testConfig {
 		fmt.Println("Configuration file is valid")
 		return
